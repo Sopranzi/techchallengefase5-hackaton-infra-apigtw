@@ -7,7 +7,7 @@ terraform {
   }
   # Recomendo configurar um bucket S3 para guardar o estado (backend)
   backend "s3" {
-    bucket = "terraform-state-soat-fase05" # Altere para o nome do seu bucket
+    bucket = "terraform-state-soat-fase05-hackton-g15" # Altere para o nome do seu bucket
     key    = "apigateway/terraform.tfstate"
     region = "us-east-1"
   }
