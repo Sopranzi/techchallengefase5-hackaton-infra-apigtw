@@ -1,0 +1,111 @@
+name: CI/CD Gateway & Auto PR
+
+on:
+  workflow_dispatch: # Permite rodar manualmente
+  push:
+    branches:
+      - '**' # Monitora todas as branches
+    paths:
+      - 'infra/**' # Só roda se mexer na infra do gateway
+      - '.github/workflows/**'
+      - 'README.md'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # ------------------------------------------------------------------
+  # JOB 1: VALIDAÇÃO (Plan)
+  # ------------------------------------------------------------------
+  validate:
+    name: "Terraform Plan"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./infra
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Terraform Init
+        # Assume que o bucket já existe (configurado no provider.tf)
+        run: terraform init
+
+      - name: Terraform Plan
+        # Apenas planeja para ver se a sintaxe e as referências estão ok
+        run: terraform plan -var="lambda_auth_arn=${{ secrets.LAMBDA_AUTH_ARN }}" -no-color
+
+  # ------------------------------------------------------------------
+  # JOB 2: ABRIR PR AUTOMATICAMENTE
+  # ------------------------------------------------------------------
+  open-pr:
+    name: "Open Pull Request"
+    needs: validate
+    if: github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --base main \
+            --head ${{ github.ref_name }} \
+            --title "Auto PR: Infra Gateway - ${{ github.ref_name }}" \
+            --body "PR criado automaticamente pela Pipeline após sucesso no Terraform Plan." \
+            || echo "PR já existe ou houve erro na criação (ignorando)."
+
+  # ------------------------------------------------------------------
+  # JOB 3: DEPLOY (Apenas na Main)
+  # ------------------------------------------------------------------
+  deploy:
+    name: "Terraform Apply"
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./infra
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply -var="lambda_auth_arn=${{ secrets.LAMBDA_AUTH_ARN }}" -auto-approve
+      
+      - name: Show API Endpoint
+        run: terraform output api_gateway_endpoint
