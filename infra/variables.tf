@@ -16,19 +16,19 @@ variable "project_name" {
 variable "kong_nlb_dns" {
   type        = string
   description = "DNS do NLB criado pelo Service kong-proxy (ex.: k8s-kong-kongproxy-xxxx.elb.amazonaws.com)"
-  default     = "a3b26e82eb34a458eaf7262cc1a31ff3-577bf52bfd470062.elb.us-east-1.amazonaws.com"
+  default     = "a1c6ff06614d644eca19a9bb6d4cebbc-48fc6bd584af2188.elb.us-east-1.amazonaws.com"
 }
 
 variable "vpc_id" {
   type    = string
-  default = "vpc-0e72efaa7f76a42f6"
+  default = "vpc-0195a03ae31790e54"
 }
 
 variable "subnets" {
   type        = list(string)
   description = "Subnets do VPC Link (mesmas do cluster/NLB)"
   default     = [
-     "subnet-0131253332b374d8c",
-     "subnet-0e962260342810875"
+     "subnet-0fd52db26c85db5a2",
+     "subnet-013405edfa54bd9f4"
   ]
 }
